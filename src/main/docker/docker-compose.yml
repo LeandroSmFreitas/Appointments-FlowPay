@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: appointments-flowpay-postgres
+    environment:
+      POSTGRES_DB: appointments-flowpay
+      POSTGRES_USER: flowpay
+      POSTGRES_PASSWORD: flowpay
+    ports:
+      - "5432:5432"
+    volumes:
+      - appointments-flowpay-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowpay -d appointments-flowpay"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  appointments-flowpay-postgres-data:
