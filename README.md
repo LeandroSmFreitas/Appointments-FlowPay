@@ -23,7 +23,7 @@ O projeto foi construido como um monolito modular com Spring Boot, PostgreSQL co
 
 O desenho abaixo representa a visao de arquitetura e possiveis caminhos de evolucao. O backend atual implementa o nucleo como monolito modular, mantendo Redis, Kafka/RabbitMQ e separacao em servicos como alternativas futuras caso o volume real justifique.
 
-![System Design](docs/system-design.png)
+
 
 ## Dominio
 
