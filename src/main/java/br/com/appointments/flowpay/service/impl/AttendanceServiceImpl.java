@@ -12,11 +12,18 @@ import br.com.appointments.flowpay.service.AttendanceService;
 import br.com.appointments.flowpay.service.DistributionService;
 import br.com.appointments.flowpay.service.event.DashboardEvent;
 import br.com.appointments.flowpay.service.event.DashboardEventPublisher;
+import br.com.appointments.flowpay.service.filter.AttendanceSearchFilter;
+import br.com.appointments.flowpay.service.filter.PageableFactory;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,10 +32,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class AttendanceServiceImpl implements AttendanceService {
 
+    private static final Map<String, String> ALLOWED_SORTS = Map.of(
+            "createdAt", "createdAt",
+            "customerName", "customerName",
+            "status", "status",
+            "team", "team.name",
+            "assignedAgentName", "assignedAgent.name"
+    );
+
     private final AttendanceRepository attendanceRepository;
     private final AttendanceRoutingService attendanceRoutingService;
     private final DistributionService distributionService;
     private final DashboardEventPublisher dashboardEventPublisher;
+    private final PageableFactory pageableFactory;
 
     @Override
     @Transactional
@@ -39,8 +55,17 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Attendance> findAll() {
-        return attendanceRepository.findAllByOrderByCreatedAtDesc();
+    public Page<Attendance> search(AttendanceSearchFilter filter) {
+        Pageable pageable = pageableFactory.create(
+                filter.page(),
+                filter.size(),
+                filter.sort(),
+                "createdAt",
+                Sort.Direction.DESC,
+                ALLOWED_SORTS
+        );
+
+        return attendanceRepository.findAll(buildSpecification(filter), pageable);
     }
 
     @Override
@@ -121,5 +146,21 @@ public class AttendanceServiceImpl implements AttendanceService {
         }
 
         agent.setActiveCount(agent.getActiveCount() - 1);
+    }
+
+    private Specification<Attendance> buildSpecification(AttendanceSearchFilter filter) {
+        Specification<Attendance> specification = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
+
+        if (filter.status() != null) {
+            specification = specification.and((root, query, criteriaBuilder) ->
+                    criteriaBuilder.equal(root.get("status"), filter.status()));
+        }
+
+        if (filter.team() != null) {
+            specification = specification.and((root, query, criteriaBuilder) ->
+                    criteriaBuilder.equal(root.get("team").get("name"), filter.team()));
+        }
+
+        return specification;
     }
 }

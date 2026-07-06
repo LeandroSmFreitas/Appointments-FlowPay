@@ -1,6 +1,9 @@
 package br.com.appointments.flowpay.web.rest;
 
+import br.com.appointments.flowpay.domain.enumeration.AgentStatus;
+import br.com.appointments.flowpay.domain.enumeration.TeamName;
 import br.com.appointments.flowpay.facade.AgentFacade;
+import br.com.appointments.flowpay.facade.dto.PageResponse;
 import br.com.appointments.flowpay.facade.dto.agent.AgentResponse;
 import br.com.appointments.flowpay.facade.dto.agent.AgentStatusUpdateRequest;
 import br.com.appointments.flowpay.facade.dto.agent.CreateAgentRequest;
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,8 +48,14 @@ public class AgentResource {
 
     @GetMapping
     @Operation(summary = "List agents")
-    public ResponseEntity<List<AgentResponse>> findAll() {
-        return ResponseEntity.ok(agentFacade.findAll());
+    public ResponseEntity<PageResponse<AgentResponse>> search(
+            @RequestParam int page,
+            @RequestParam int size,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) AgentStatus status,
+            @RequestParam(required = false) TeamName team
+    ) {
+        return ResponseEntity.ok(agentFacade.search(page, size, sort, status, team));
     }
 
     @PatchMapping("/{id}/status")

@@ -11,8 +11,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class RestExceptionHandler {
@@ -58,6 +60,32 @@ public class RestExceptionHandler {
                         violation.getMessage()
                 ))
                 .toList();
+
+        return build(HttpStatus.BAD_REQUEST, "Validation failed", request.getRequestURI(), errors);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<RestErrorMessage> handleMissingRequestParameter(
+            MissingServletRequestParameterException ex,
+            HttpServletRequest request
+    ) {
+        List<RestFieldErrors> errors = List.of(new RestFieldErrors(
+                ex.getParameterName(),
+                "Required request parameter is missing"
+        ));
+
+        return build(HttpStatus.BAD_REQUEST, "Validation failed", request.getRequestURI(), errors);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<RestErrorMessage> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request
+    ) {
+        List<RestFieldErrors> errors = List.of(new RestFieldErrors(
+                ex.getName(),
+                "Invalid value"
+        ));
 
         return build(HttpStatus.BAD_REQUEST, "Validation failed", request.getRequestURI(), errors);
     }

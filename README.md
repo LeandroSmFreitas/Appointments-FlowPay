@@ -17,7 +17,7 @@ O projeto foi construido como um monolito modular com Spring Boot, PostgreSQL co
 - Bean Validation
 - Springdoc OpenAPI / Swagger
 - Server-Sent Events com `SseEmitter`
-- Testcontainers para testes de integracao
+- JUnit 5, Mockito e Cucumber para testes
 
 ## System Design
 
@@ -145,7 +145,7 @@ Com a aplicacao rodando:
 
 ```text
 POST  /api/v1/agents
-GET   /api/v1/agents
+GET   /api/v1/agents?page=0&size=10&sort=name,asc&status=ONLINE&team=CARTOES
 PATCH /api/v1/agents/{id}/status
 GET   /api/v1/agents/{id}/attendances
 ```
@@ -154,11 +154,51 @@ GET   /api/v1/agents/{id}/attendances
 
 ```text
 POST  /api/v1/attendances
-GET   /api/v1/attendances
+GET   /api/v1/attendances?page=0&size=10&sort=createdAt,desc&status=WAITING&team=CARTOES
 GET   /api/v1/attendances/{id}
 PATCH /api/v1/attendances/{id}/finish
 PATCH /api/v1/attendances/{id}/cancel
 ```
+
+## Paginacao, Ordenacao E Filtros
+
+Os endpoints `GET /api/v1/agents` e `GET /api/v1/attendances` sao paginados no backend. O front deve enviar `page` e `size` e chamar novamente a API sempre que pagina, tamanho, ordenacao ou filtros mudarem.
+
+Formato de resposta:
+
+```json
+{
+  "content": [],
+  "page": 0,
+  "size": 10,
+  "totalElements": 0,
+  "totalPages": 0,
+  "first": true,
+  "last": true
+}
+```
+
+Parametros comuns:
+
+- `page`: pagina atual, iniciando em `0`.
+- `size`: quantidade de itens por pagina, entre `1` e `100`.
+- `sort`: campo e direcao no formato `campo,asc` ou `campo,desc`.
+- `status`: filtro por status.
+- `team`: filtro por time.
+
+Atendimentos:
+
+- Status aceitos: `WAITING`, `IN_PROGRESS`, `FINISHED`, `CANCELLED`.
+- Times aceitos: `CARTOES`, `EMPRESTIMOS`, `OUTROS`.
+- Ordenacao aceita: `createdAt`, `customerName`, `status`, `team`, `assignedAgentName`.
+- Ordenacao padrao: `createdAt,desc`.
+
+Agentes:
+
+- Status aceitos: `ONLINE`, `PAUSED`, `OFFLINE`.
+- Times aceitos: `CARTOES`, `EMPRESTIMOS`, `OUTROS`.
+- Ordenacao aceita: `name`, `activeCount`, `status`, `team`, `createdAt`.
+- Ordenacao padrao: `name,asc`.
 
 ### Dashboard
 
@@ -202,6 +242,8 @@ Isso evita que duas requisicoes concorrentes atribuam o mesmo atendimento ou exc
 
 ## Testes
 
+O projeto usa testes unitarios e cenarios BDD com Cucumber. Nenhum teste automatizado depende de Docker.
+
 Rodar testes:
 
 ```powershell
@@ -210,7 +252,22 @@ $env:Path="$env:JAVA_HOME\bin;$env:Path"
 .\mvnw.cmd test
 ```
 
-Observacao: os testes de integracao usam Testcontainers e exigem Docker ativo.
+Estrutura dos testes:
+
+- Unitarios: `src/test/java`
+- Features Cucumber: `src/test/resources/features`
+- Step definitions: `src/test/java/br/com/appointments/flowpay/bdd`
+
+Os cenarios Cucumber cobrem:
+
+- Roteamento por assunto para `CARTOES`, `EMPRESTIMOS` e `OUTROS`.
+- Atendimento atribuido imediatamente quando existe agente com capacidade.
+- Atendimento mantido em fila quando nao existe agente disponivel.
+- Garantia de que `activeCount` nao ultrapassa 3.
+- Finalizacao redistribuindo o proximo atendimento em fila.
+- Cancelamento redistribuindo o proximo atendimento em fila.
+- Criacao de agente consumindo atendimentos em fila do time.
+- Retorno de agente para `ONLINE` consumindo atendimentos em fila do time.
 
 ## Decisoes de Projeto
 

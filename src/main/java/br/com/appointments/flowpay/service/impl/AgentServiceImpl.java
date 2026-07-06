@@ -13,10 +13,17 @@ import br.com.appointments.flowpay.service.DistributionService;
 import br.com.appointments.flowpay.service.TeamService;
 import br.com.appointments.flowpay.service.event.DashboardEvent;
 import br.com.appointments.flowpay.service.event.DashboardEventPublisher;
+import br.com.appointments.flowpay.service.filter.AgentSearchFilter;
+import br.com.appointments.flowpay.service.filter.PageableFactory;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,12 +33,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentServiceImpl implements AgentService {
 
     private static final int MAX_ACTIVE_ATTENDANCES = 3;
+    private static final Map<String, String> ALLOWED_SORTS = Map.of(
+            "name", "name",
+            "activeCount", "activeCount",
+            "status", "status",
+            "team", "team.name",
+            "createdAt", "createdAt"
+    );
 
     private final AgentRepository agentRepository;
     private final AttendanceRepository attendanceRepository;
     private final TeamService teamService;
     private final DashboardEventPublisher dashboardEventPublisher;
     private final DistributionService distributionService;
+    private final PageableFactory pageableFactory;
 
     @Override
     @Transactional
@@ -43,14 +58,25 @@ public class AgentServiceImpl implements AgentService {
         agent.setActiveCount(0);
 
         Agent savedAgent = agentRepository.save(agent);
+        distributeWaitingAttendances(savedAgent);
+
         log.info("Agent {} created for team {}", savedAgent.getId(), team.getName());
         return savedAgent;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Agent> findAll() {
-        return agentRepository.findAllByOrderByNameAsc();
+    public Page<Agent> search(AgentSearchFilter filter) {
+        Pageable pageable = pageableFactory.create(
+                filter.page(),
+                filter.size(),
+                filter.sort(),
+                "name",
+                Sort.Direction.ASC,
+                ALLOWED_SORTS
+        );
+
+        return agentRepository.findAll(buildSpecification(filter), pageable);
     }
 
     @Override
@@ -96,7 +122,23 @@ public class AgentServiceImpl implements AgentService {
         }
 
         if (assignedCount > 0) {
-            log.info("Agent {} received {} waiting attendances after going online", agent.getId(), assignedCount);
+            log.info("Agent {} received {} waiting attendances", agent.getId(), assignedCount);
         }
+    }
+
+    private Specification<Agent> buildSpecification(AgentSearchFilter filter) {
+        Specification<Agent> specification = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
+
+        if (filter.status() != null) {
+            specification = specification.and((root, query, criteriaBuilder) ->
+                    criteriaBuilder.equal(root.get("status"), filter.status()));
+        }
+
+        if (filter.team() != null) {
+            specification = specification.and((root, query, criteriaBuilder) ->
+                    criteriaBuilder.equal(root.get("team").get("name"), filter.team()));
+        }
+
+        return specification;
     }
 }
